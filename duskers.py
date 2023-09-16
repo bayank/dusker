@@ -1,9 +1,22 @@
 import argparse
+import datetime
+import json
 import os
 import random
 import sys
+import logging
 
 DEBUG_MODE = False
+cls_state = False
+savedata = "save_file.json"
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+console_handler = logging.StreamHandler()
+log_format = '%(asctime)s %(levelname)s: %(message)s'
+console_handler.setFormatter(logging.Formatter(log_format))
+logger.addHandler(console_handler)
+#logger.info('App Starting')
 
 shape1 = \
     ("\
@@ -42,6 +55,7 @@ class Robot:
 robot1 = Robot("Pacman", shape1)
 robot2 = Robot("Oogie Boogie", shape2)
 robot3 = Robot("happy", shape3)
+#logger.info('Robots initialized')
 
 
 class LocationObj:
@@ -50,9 +64,12 @@ class LocationObj:
         self.name = name
         self.titanium = titanium
 
+
 def cls():
-    #os.system('cls' if os.name == 'nt' else 'clear')
-    pass
+    if cls_state:
+        os.system('cls' if os.name == 'nt' else 'clear')
+    else:
+        pass
 
 
 def print_robots(*robots):
@@ -76,11 +93,14 @@ def print_robots(*robots):
 
 class Game:
     def __init__(self, seed, min_duration, max_duration, locations):
+        self.last_save = None
+        self.slot = 1
         self.num = 1
         self.debug = DEBUG_MODE
         self.game_state = True
-        self.player = None
+        self.name = None
         self.titanium = 0
+        self.robots = 3
 
         self.seed = seed
         self.min_duration = min_duration
@@ -114,34 +134,38 @@ class Game:
             ╰━━━┻╯╱╰╯╱╰╯╱╰╯╱╰┻╯╱╰━╯╱╰━┻╯╰┻━━╯╰━━━┻━━┻━━┻━┻━━┻━━┻━╯\n\
             \t\t(Survival ASCII Strategy Game)")
             print("+=======================================================================+")
-            print("[Play]")
+            print("[New] Game")
+            print("[Load] Game")
             print("[High] Scores")
             print("[Help]")
             print("[Exit]")
 
             command = (input("Your command:\n")).lower()
 
-            if command == "play" or command == "p":
+            if command == "new" or command == "n":
+                self.name = None
                 self.play_sub_menu()
+            elif command == "load" or command == "l":
+                self.load_menu()
             elif command == "high scores" or command == "high" or command == "hi" or command == "h":
                 self.high_scores()
             elif command == "help" or command == "h":
                 self.help_menu()
             elif command == "exit" or command == "e":
                 print("Thanks for playing, bye!")
-                # sys.exit(0)
-                self.game_state = False
+                sys.exit(0)
+
             else:
                 print("Invalid input")
                 command = (input("Your command:\n")).lower()
 
     def play_sub_menu(self):
         cls()
-        if self.player is None:
-            self.player = input("Enter your name:")
-            print(f"Greetings, commander {self.player}!")
+        if self.name is None:
+            self.name = input("Enter your name:")
+            print(f"Greetings, commander {self.name}!")
         else:
-            print(f"Welcome back {self.player}!")
+            print(f"Welcome back {self.name}!")
         print(f"Are you ready to begin?\n\t[Yes] [No] Return to Main[Menu]")
         begin = input("Your command:").lower()
         while begin not in ["yes", "no", "menu", "y", "n", "m"]:
@@ -188,12 +212,10 @@ class Game:
         if option == "main" or option == "m":
             self.main_menu()
         if option == "save" or option == "s":
-            print("Coming SOON! Thanks for playing!")
-            sys.exit(0)
+            self.save_menu()
         if option == "exit" or option == "e":
             print("Thanks for playing, bye!")
             sys.exit(0)
-
 
     def hub(self):
         cls()
@@ -218,8 +240,7 @@ class Game:
             print("Coming SOON! Thanks for playing!")
             sys.exit(0)
         if option == "save" or option == "s":
-            print("Coming SOON! Thanks for playing!")
-            sys.exit(0)
+            self.save_menu()
         if option == "m" or option == "menu":
             self.hub_menu()
 
@@ -284,23 +305,142 @@ class Game:
         num_locations = random.randint(1, 9)
         for name in range(num_locations):
             name = random.choice(locations)
-            yield LocationObj(self.num, name, random.randint(10,100))
+            yield LocationObj(self.num, name, random.randint(10, 100))
             self.num += 1
 
-    def are_all_numbers_int(self, locations):
-        return all(isinstance(location.num,int) for location in locations)
-    def print_debug(self):
-        print("***********************************")
-        print(f"Debug: {self.debug}")
-        print(f"Game State: {self.game_state}")
-        print(f"Player: {self.player}")
-        print(f"Seed: {self.seed}")
-        print(f"Min_Duration: {self.min_duration}")
-        print(f"Max_duration: {self.max_duration}")
-        print(f"Locations: {self.locations}")
-        print(f"Titanium: {self.titanium}")
-        print("***********************************")
+    @staticmethod
+    def are_all_numbers_int(locations):
+        return all(isinstance(location.num, int) for location in locations)
 
+    def load_menu(self):
+        while True:
+
+            self.pick_slot(savedata)
+            print("Your Command:")
+            slot = input("")
+
+            if slot in ["1", "2", "3"]:
+                while True:
+                    if self.load(savedata, slot) == "Empty slot!":
+                        break
+
+
+                    else:
+                        self.load(savedata, slot)
+                        print("|==============================|")
+                        print("|    GAME LOADED SUCCESSFULLY  |")
+                        print("|==============================|")
+                        print(f"Welcome back, commander {self.name}!")
+                        self.hub()
+            elif slot == "back":
+                self.main_menu()
+
+    def save_menu(self):
+        while True:
+
+            self.pick_slot(savedata)
+            print("Your Command:")
+            slot = input("")
+
+            if slot in ["1", "2", "3"]:
+                if self.load(savedata, slot) == "Empty slot!":
+                    self.create_savedata(savedata)
+                    self.save(savedata, slot)
+                    print("|==============================|")
+                    print("|    GAME SAVED SUCCESSFULLY   |")
+                    print("|==============================|")
+                    self.hub()
+                else:
+                    self.save(savedata,slot)
+                    print("|==============================|")
+                    print("|    GAME SAVED SUCCESSFULLY   |")
+                    print("|==============================|")
+                    self.hub()
+            elif slot == "back":
+                self.hub()
+    def create_savedata(self, filename):
+        blank_game_dict = {'slots': {'1': [{'Name': None, 'Titanium': None, 'Robots': None, 'Last Save': None}], '2': [{'Name': None, 'Titanium': None, 'Robots': None, 'Last Save': None}], '3': [{'Name': None, 'Titanium': None, 'Robots': None, 'Last Save': None}]}}
+
+        with open(filename, 'w') as f:
+            f.write((json.dumps(blank_game_dict, indent=2, default=str)))
+
+
+    def pick_slot(self, filename):
+        def printslots():
+            with open(filename, 'r') as f:
+                game_dict = json.load(f)
+                print("\tSelect a save slot:")
+                for slotnum in game_dict["slots"]:
+                    for item in game_dict["slots"][slotnum]:
+                        if item['Name'] is None:
+                            print(f"\t[{slotnum}] empty")
+                        else:
+                            print(f"\t[{slotnum}] {item['Name']} Titanium: {item['Titanium']} Robots: {item['Robots']} Last Save: {item['Last Save']}")
+
+        try:
+            printslots()
+        except json.decoder.JSONDecodeError:
+            self.create_savedata(savedata)
+            printslots()
+        except FileNotFoundError:
+            #print("Empty slot!")
+            self.create_savedata(savedata)
+            printslots()
+
+
+
+
+    def save(self, filename, slotnum):
+        last_save = datetime.datetime.now()
+        formatted_dt = last_save.strftime('%Y-%m-%d %H:%M')
+
+        with open(filename, 'r') as f:
+            game_dict = json.load(f)
+
+            for item in game_dict["slots"][slotnum]:
+                item["Name"] = self.name
+                item["Titanium"] = self.titanium
+                item["Robots"] = self.robots
+                item["Last Save"] = formatted_dt
+
+        with open(filename, 'w') as f:
+            f.write((json.dumps(game_dict, indent=2, default=str)))
+
+    def load(self, filename, slotnum):
+        try:
+            with open(filename, 'r') as f:
+                game_dict = json.load(f)
+
+                for item in game_dict["slots"][slotnum]:
+                    if item['Name'] is None:
+                        print(f"Empty slot!")
+                        return "Empty slot!"
+
+                    else:
+                        self.name = item["Name"]
+                        self.titanium = item["Titanium"]
+                        self.robots = item["Robots"]
+                        self.last_save = item["Last Save"]
+        except json.decoder.JSONDecodeError:
+            print("Empty slot!")
+            return "Empty slot!"
+
+
+
+
+    def print_debug(self):
+        logger.info("***********************************")
+        logger.info(f"Debug: {self.debug}")
+        logger.info(f"Game State: {self.game_state}")
+        logger.info(f"Player Name: {self.name}")
+        logger.info(f"Seed: {self.seed}")
+        logger.info(f"Min_Duration: {self.min_duration}")
+        logger.info(f"Max_duration: {self.max_duration}")
+        logger.info(f"Locations: {self.locations}")
+        logger.info(f"Titanium: {self.titanium}")
+        logger.info(f"Robots: {self.robots}")
+        logger.info(f"Last save: {self.last_save}")
+        logger.info("***********************************")
 
 
 
@@ -309,7 +449,8 @@ parser = argparse.ArgumentParser(description="Welcome to Bayan The Coolest, the 
 parser.add_argument("seed", type=str, nargs='?', default=69, help="Random seed (default: 69)")
 parser.add_argument("min_duration", type=int, nargs='?', default=0, help="Minimum animation duration (default: 0)")
 parser.add_argument("max_duration", type=int, nargs='?', default=0, help="Maximum animation duration (default: 0)")
-parser.add_argument("locations", type=str, nargs='?', default="Place_A,Place_B,Place_C", help="List of locations, enter as a string separated by commas, such as  High_street,Green_park,Destroyed_Arch")
+parser.add_argument("locations", type=str, nargs='?', default="Place_A,Place_B,Place_C",
+                    help="List of locations, enter as a string separated by commas, such as  High_street,Green_park,Destroyed_Arch")
 
 args = parser.parse_args()
 
@@ -321,4 +462,3 @@ game = Game(
 )
 
 game.main_menu()
-#game.explore()
