@@ -6,9 +6,10 @@ import random
 import sys
 import logging
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 cls_state = False
 savedata = "save_file.json"
+
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -16,7 +17,9 @@ console_handler = logging.StreamHandler()
 log_format = '%(asctime)s %(levelname)s: %(message)s'
 console_handler.setFormatter(logging.Formatter(log_format))
 logger.addHandler(console_handler)
-#logger.info('App Starting')
+
+if DEBUG_MODE:
+    logger.info('App Starting')
 
 shape1 = \
     ("\
@@ -52,18 +55,18 @@ class Robot:
         self.shape = shape
 
 
-robot1 = Robot("Pacman", shape1)
-robot2 = Robot("Oogie Boogie", shape2)
-robot3 = Robot("happy", shape3)
-#logger.info('Robots initialized')
+if DEBUG_MODE:
+    logger.info('Robots initialized')
 
 
 class LocationObj:
-    def __init__(self, num, name, titanium):
+    def __init__(self, num, name, titanium, encounter_rate):
         self.num = num
         self.name = name
         self.titanium = titanium
-
+        self.enc_rate = encounter_rate
+if DEBUG_MODE:
+    logger.info('Locations initialized')
 
 def cls():
     if cls_state:
@@ -94,13 +97,13 @@ def print_robots(*robots):
 class Game:
     def __init__(self, seed, min_duration, max_duration, locations):
         self.last_save = None
-        self.slot = 1
         self.num = 1
         self.debug = DEBUG_MODE
         self.game_state = True
         self.name = None
-        self.titanium = 0
-        self.robots = 3
+        self.titanium = 2000
+        self.robots = 0
+        self.robot_list = []
 
         self.seed = seed
         self.min_duration = min_duration
@@ -115,10 +118,26 @@ class Game:
         random.seed(self.seed)
 
         # Initialize exploration-related variables
-        self.explore_count = 0
         self.explored_locations = []
-        self.place_dict = {}
 
+
+        # Initialize upgrade state:
+        self. titanium_visible = False
+        self.encounter_rate_visible = False
+
+        if DEBUG_MODE:
+            logger.info('Game State initialized')
+    def create_new_robot(self):
+        # Create a new robot with a name based on the current count of robot objects
+        if DEBUG_MODE:
+            logger.info('New Robot Created')
+        self.robots += 1
+        new_robot = Robot(f"Robot{self.robots}", random.choice([shape1, shape2, shape3]))
+        return new_robot
+
+    def print_robot_list(self):
+        for name in self.robot_list:
+            print(f"\tRobot name: {name.name} Shape: {name.shape[:15]}")
     def main_menu(self):
         cls()
         while self.game_state:
@@ -144,6 +163,9 @@ class Game:
 
             if command == "new" or command == "n":
                 self.name = None
+                self.titanium = 5000
+                self.robots = 0
+                self.robot_list = [self.create_new_robot(), self.create_new_robot(), self.create_new_robot()]
                 self.play_sub_menu()
             elif command == "load" or command == "l":
                 self.load_menu()
@@ -222,7 +244,7 @@ class Game:
         if self.debug:
             self.print_debug()
         print("\n+==============================================================================+")
-        print_robots(robot1, robot2, robot3)
+        print_robots(*self.robot_list)
         print("+==============================================================================+")
         print(f"| Titanium: {self.titanium}\t\t\t\t\t\t\t\t       |")
         print("+==============================================================================+")
@@ -237,14 +259,41 @@ class Game:
         if option == "ex" or option == "explore" or option == "e":
             self.explore()
         if option == "up" or option == "upgrade" or option == "u":
-            print("Coming SOON! Thanks for playing!")
-            sys.exit(0)
+            self.upgrade()
         if option == "save" or option == "s":
             self.save_menu()
         if option == "m" or option == "menu":
             self.hub_menu()
 
     def explore(self):
+        if DEBUG_MODE:
+            logger.info('Calling explore()')
+        def deploy():
+            print("Deploying Robots")
+            second_rand = random.random()
+            if DEBUG_MODE:
+                logger.info(f'second_rand = {second_rand}')
+            if second_rand < place.enc_rate:
+                print("Enemy robots...")
+                self.robots -= 1
+                self.robot_list.pop()
+                if self.robots == 0:
+                    print("Mission aborted, the last robot lost...")
+                    print("|==============================|")
+                    print("|          GAME OVER!          |")
+                    print("|==============================|")
+                    self.main_menu()
+                else:
+                    print(f"{place.name} explored successfully, 1 robot lost...")
+                    print(f"Acquired {place.titanium} lumps of titanium")
+                    self.titanium += place.titanium
+                    self.hub()
+            else:
+                print(f"{place.name} explored successfully, with no damage taken")
+                print(f"Acquired {place.titanium} lumps of titanium")
+                self.titanium += place.titanium
+                self.hub()
+
         cls()
         if self.debug:
             self.print_debug()
@@ -262,42 +311,53 @@ class Game:
         self.explored_locations.append(next(location_gen))
 
         while True:
-
+            output_string = ""
             for place in self.explored_locations:
-                print(f"[{place.num}] {place.name}")
+                place_info = f"[{place.num}] {place.name}"
+
+                if self.titanium_visible:
+                    place_info += f" Titanium: {place.titanium}"
+
+                if self. encounter_rate_visible:
+                    place_info += f" Encounter rate: {round(place.enc_rate*100)}%"
+
+                output_string += place_info + "\n"
+
+            print(output_string)
+
             print("[S] to continue searching")
             user_input = input("Your command: ")
 
-            if user_input == "back":
+            if user_input == "back" or user_input == "back":
                 self.hub()
 
-            if user_input == "s":
+            elif user_input == "s":
                 try:
                     self.explored_locations.append(next(location_gen))
                     print("Searching")
                 # When there are no more places in the list for the generator
                 except StopIteration:
-                    while user_input == "s":
-                        print("Nothing more in sight.")
-                        print("[Back]")
-                        user_input = input("Your command: ")
+                    if DEBUG_MODE:
+                        logger.info('Reached end of places')
+                    while True:
 
-                    # A valid place selected, deploy robots
-                    if int(user_input) in [location.num for location in self.explored_locations]:
-                        print("Deploying Robots")
-                        print(f"{place.name} explored successfully, with no damage taken")
-                        print(f"Acquired {place.titanium} lumps of titanium")
-                        self.titanium += place.titanium
-                        self.hub()
+                        if user_input == "s":
+                            print("Nothing more in sight.")
+                            print("[Back]")
+                            user_input = input("Your command: ")
 
-            try:
-                if int(user_input) in [location.num for location in self.explored_locations]:
-                    print("Deploying Robots")
-                    print(f"{place.name} explored successfully, with no damage taken")
-                    print(f"Acquired {place.titanium} lumps of titanium")
-                    self.titanium += place.titanium
-                    self.hub()
-            except ValueError:
+                        # A valid place selected, deploy robots
+                        elif user_input in [str(location.num) for location in self.explored_locations]:
+                            deploy()
+                        elif user_input == "back" or user_input == "back":
+                            self.hub()
+                        else:
+                            print("Invalid input.")
+                            break
+
+            elif user_input in [str(location.num) for location in self.explored_locations]:
+                deploy()
+            else:
                 print("Invalid input.")
                 continue
 
@@ -305,7 +365,9 @@ class Game:
         num_locations = random.randint(1, 9)
         for name in range(num_locations):
             name = random.choice(locations)
-            yield LocationObj(self.num, name, random.randint(10, 100))
+            titanium = random.randint(10, 100)
+            enc_rate = random.random()
+            yield LocationObj(self.num, name, titanium, enc_rate)
             self.num += 1
 
     @staticmethod
@@ -380,10 +442,13 @@ class Game:
         try:
             printslots()
         except json.decoder.JSONDecodeError:
+            if DEBUG_MODE:
+                logger.info('hit json.decoder.JSONDecodeError, creating savedata JSON')
             self.create_savedata(savedata)
             printslots()
         except FileNotFoundError:
-            #print("Empty slot!")
+            if DEBUG_MODE:
+                logger.info('hit FileNotFoundError, creating savedata JSON')
             self.create_savedata(savedata)
             printslots()
 
@@ -425,7 +490,52 @@ class Game:
             print("Empty slot!")
             return "Empty slot!"
 
+    def upgrade(self):
+        print("|================================|")
+        print("|          UPGRADE STORE         |")
+        print("|                         Price  |")
+        print("| [1] Titanium Scan         250  |")
+        print("| [2] Enemy Encounter Scan  500  |")
+        print("| [3] New Robot            1000  |")
+        print("|                                |")
+        print("| [Back]                         |")
+        print("|================================|")
 
+        while True:
+            choice = input("Your command:")
+
+            if choice =="1":
+                if self.titanium < 250:
+                    print("Not enough titanium!")
+                else:
+                    self.titanium_visible = True
+                    self.titanium -= 250
+                    print("Purchase successful. You can now see how much titanium you can get from each found location.")
+                    self.hub()
+
+            elif choice == "2":
+                if self.titanium < 500:
+                    print("Not enough titanium!")
+                else:
+                    self.encounter_rate_visible = True
+                    self.titanium -= 500
+                    print("Purchase successful. You will now see how likely you will encounter an enemy at each found location.")
+                    self.hub()
+
+            elif choice == "3":
+                if self.titanium < 1000:
+                    print("Not enough titanium!")
+                else:
+                    self.titanium -= 1000
+                    self.robots += 1
+                    self.robot_list.append(self.create_new_robot())
+                    print("Purchase successful. You now have an additional robot")
+                    self.hub()
+
+            elif choice.lower() == "back" or choice.lower() == "b":
+                self.hub()
+            else:
+                print("Invalid input.")
 
 
     def print_debug(self):
@@ -439,6 +549,7 @@ class Game:
         logger.info(f"Locations: {self.locations}")
         logger.info(f"Titanium: {self.titanium}")
         logger.info(f"Robots: {self.robots}")
+        logger.info(f"Robot list: {self.print_robot_list()}")
         logger.info(f"Last save: {self.last_save}")
         logger.info("***********************************")
 
@@ -462,3 +573,4 @@ game = Game(
 )
 
 game.main_menu()
+#game.upgrade()
