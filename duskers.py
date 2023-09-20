@@ -7,7 +7,7 @@ import sys
 import logging
 
 DEBUG_MODE = True
-cls_state = False
+cls_state = True
 savedata = "save_file.json"
 
 
@@ -53,6 +53,10 @@ class Robot:
     def __init__(self, name, shape):
         self.name = name
         self.shape = shape
+
+    def __repr__(self):
+        class_name = type(self).__name__
+        return f"{class_name}(name={self.name})"
 
 
 if DEBUG_MODE:
@@ -101,7 +105,7 @@ class Game:
         self.debug = DEBUG_MODE
         self.game_state = True
         self.name = None
-        self.titanium = 2000
+        self.titanium = 0
         self.robots = 0
         self.robot_list = []
 
@@ -120,10 +124,12 @@ class Game:
         # Initialize exploration-related variables
         self.explored_locations = []
 
-
         # Initialize upgrade state:
         self. titanium_visible = False
         self.encounter_rate_visible = False
+
+        self.game_dict = {}
+        self.high_scores_dict = {}
 
         if DEBUG_MODE:
             logger.info('Game State initialized')
@@ -131,14 +137,14 @@ class Game:
         # Create a new robot with a name based on the current count of robot objects
         if DEBUG_MODE:
             logger.info('New Robot Created')
-        self.robots += 1
         new_robot = Robot(f"Robot{self.robots}", random.choice([shape1, shape2, shape3]))
+        self.robots += 1
         return new_robot
 
     def print_robot_list(self):
-        for name in self.robot_list:
-            print(f"\tRobot name: {name.name} Shape: {name.shape[:15]}")
+        print(self.robot_list)
     def main_menu(self):
+        # Model While() loop for validating user input, should refactor all the other sub-menus to read like this.
         cls()
         while self.game_state:
             if self.debug:
@@ -163,7 +169,7 @@ class Game:
 
             if command == "new" or command == "n":
                 self.name = None
-                self.titanium = 5000
+                self.titanium = 0
                 self.robots = 0
                 self.robot_list = [self.create_new_robot(), self.create_new_robot(), self.create_new_robot()]
                 self.play_sub_menu()
@@ -179,9 +185,10 @@ class Game:
 
             else:
                 print("Invalid input")
-                command = (input("Your command:\n")).lower()
+                #command = (input("Your command:\n")).lower()
 
     def play_sub_menu(self):
+        # Trying a different way of validating and catching invalid user input to see if I like it better.
         cls()
         if self.name is None:
             self.name = input("Enter your name:")
@@ -205,7 +212,7 @@ class Game:
         cls()
         print("There are no scores to display")
         print("\t[Back]")
-        if input().lower() == "back":
+        if input().lower() == "back" :
             self.main_menu()
 
     def help_menu(self):
@@ -235,6 +242,7 @@ class Game:
             self.main_menu()
         if option == "save" or option == "s":
             self.save_menu()
+            sys.exit(0)
         if option == "exit" or option == "e":
             print("Thanks for playing, bye!")
             sys.exit(0)
@@ -393,6 +401,8 @@ class Game:
                         print("|    GAME LOADED SUCCESSFULLY  |")
                         print("|==============================|")
                         print(f"Welcome back, commander {self.name}!")
+                        if DEBUG_MODE:
+                            self.print_debug()
                         self.hub()
             elif slot == "back":
                 self.main_menu()
@@ -405,23 +415,17 @@ class Game:
             slot = input("")
 
             if slot in ["1", "2", "3"]:
-                if self.load(savedata, slot) == "Empty slot!":
-                    self.create_savedata(savedata)
-                    self.save(savedata, slot)
-                    print("|==============================|")
-                    print("|    GAME SAVED SUCCESSFULLY   |")
-                    print("|==============================|")
-                    self.hub()
-                else:
-                    self.save(savedata,slot)
-                    print("|==============================|")
-                    print("|    GAME SAVED SUCCESSFULLY   |")
-                    print("|==============================|")
-                    self.hub()
+                self.save(savedata,slot)
+                print("|==============================|")
+                print("|    GAME SAVED SUCCESSFULLY   |")
+                print("|==============================|")
+                self.hub()
             elif slot == "back":
                 self.hub()
+            else:
+                print("Invalid slot number, choose 1, 2, or 3")
     def create_savedata(self, filename):
-        blank_game_dict = {'slots': {'1': [{'Name': None, 'Titanium': None, 'Robots': None, 'Last Save': None}], '2': [{'Name': None, 'Titanium': None, 'Robots': None, 'Last Save': None}], '3': [{'Name': None, 'Titanium': None, 'Robots': None, 'Last Save': None}]}}
+        blank_game_dict = {'slots': {'1': [{'Name': None, 'Titanium': None, 'Robots': None, 'Last Save': None, "titanium_visible": False, "encounter_rate_visible": False}], '2': [{'Name': None, 'Titanium': None, 'Robots': None, 'Last Save': None, "titanium_visible": False, "encounter_rate_visible": False}], '3': [{'Name': None, 'Titanium': None, 'Robots': None, 'Last Save': None, "titanium_visible": False, "encounter_rate_visible": False}]}}
 
         with open(filename, 'w') as f:
             f.write((json.dumps(blank_game_dict, indent=2, default=str)))
@@ -430,14 +434,16 @@ class Game:
     def pick_slot(self, filename):
         def printslots():
             with open(filename, 'r') as f:
-                game_dict = json.load(f)
+                self.game_dict = json.load(f)
                 print("\tSelect a save slot:")
-                for slotnum in game_dict["slots"]:
-                    for item in game_dict["slots"][slotnum]:
+                for slotnum in self.game_dict["slots"]:
+                    for item in self.game_dict["slots"][slotnum]:
                         if item['Name'] is None:
                             print(f"\t[{slotnum}] empty")
                         else:
-                            print(f"\t[{slotnum}] {item['Name']} Titanium: {item['Titanium']} Robots: {item['Robots']} Last Save: {item['Last Save']}")
+                            print(f"\t[{slotnum}] {item['Name']} Titanium: {item['Titanium']} Robots: {item['Robots']} Last Save: {item['Last Save']} Upgrades: ", end='')
+                            print("Titanium_visible" if item['titanium_visible'] else "", end=" ")
+                            print("Enemy_info" if item['encounter_rate_visible'] else "",)
 
         try:
             printslots()
@@ -460,23 +466,25 @@ class Game:
         formatted_dt = last_save.strftime('%Y-%m-%d %H:%M')
 
         with open(filename, 'r') as f:
-            game_dict = json.load(f)
+            self.game_dict = json.load(f)
 
-            for item in game_dict["slots"][slotnum]:
+            for item in self.game_dict["slots"][slotnum]:
                 item["Name"] = self.name
                 item["Titanium"] = self.titanium
                 item["Robots"] = self.robots
                 item["Last Save"] = formatted_dt
+                item["titanium_visible"] = self.titanium_visible
+                item["encounter_rate_visible"] = self.encounter_rate_visible
 
         with open(filename, 'w') as f:
-            f.write((json.dumps(game_dict, indent=2, default=str)))
+            f.write((json.dumps(self.game_dict, indent=2, default=str)))
 
     def load(self, filename, slotnum):
         try:
             with open(filename, 'r') as f:
-                game_dict = json.load(f)
+                self.game_dict = json.load(f)
 
-                for item in game_dict["slots"][slotnum]:
+                for item in self.game_dict["slots"][slotnum]:
                     if item['Name'] is None:
                         print(f"Empty slot!")
                         return "Empty slot!"
@@ -484,13 +492,20 @@ class Game:
                     else:
                         self.name = item["Name"]
                         self.titanium = item["Titanium"]
-                        self.robots = item["Robots"]
+                        self.robots = 0
                         self.last_save = item["Last Save"]
+                        self.titanium_visible = item["titanium_visible"]
+                        self.encounter_rate_visible = item["encounter_rate_visible"]
+                        self.robot_list = []
+                        for bot in range(1, item["Robots"]+1):
+                            self.robot_list.append(self.create_new_robot())
+
         except json.decoder.JSONDecodeError:
             print("Empty slot!")
             return "Empty slot!"
 
     def upgrade(self):
+        cls()
         print("|================================|")
         print("|          UPGRADE STORE         |")
         print("|                         Price  |")
@@ -527,7 +542,6 @@ class Game:
                     print("Not enough titanium!")
                 else:
                     self.titanium -= 1000
-                    self.robots += 1
                     self.robot_list.append(self.create_new_robot())
                     print("Purchase successful. You now have an additional robot")
                     self.hub()
@@ -548,8 +562,10 @@ class Game:
         logger.info(f"Max_duration: {self.max_duration}")
         logger.info(f"Locations: {self.locations}")
         logger.info(f"Titanium: {self.titanium}")
-        logger.info(f"Robots: {self.robots}")
-        logger.info(f"Robot list: {self.print_robot_list()}")
+        logger.info(f"Number of Robots: {self.robots}")
+        logger.info(f"Robots List: {self.robot_list}")
+        logger.info(f"titanium_visible: {self.titanium_visible}")
+        logger.info(f"encounter_rate_visible: {self.encounter_rate_visible}")
         logger.info(f"Last save: {self.last_save}")
         logger.info("***********************************")
 
