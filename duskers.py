@@ -5,10 +5,13 @@ import os
 import random
 import sys
 import logging
+from dataclasses import dataclass
+from typing import List
 
-DEBUG_MODE = True
-cls_state = True
+DEBUG_MODE = False
+cls_state = False
 savedata = "save_file.json"
+high_scores_data = "high_score.json"
 
 
 logger = logging.getLogger()
@@ -69,8 +72,38 @@ class LocationObj:
         self.name = name
         self.titanium = titanium
         self.enc_rate = encounter_rate
+
+
 if DEBUG_MODE:
     logger.info('Locations initialized')
+
+
+@dataclass
+class HighScore:
+    name: str
+    titanium: int
+
+
+@dataclass
+class HighScoreList:
+    scores: List[HighScore]
+
+    def __init__(self, scores: List[HighScore] = None):
+        if scores is None:
+            self.scores = []
+        else:
+            self.scores = scores
+
+    def __iter__(self):
+        # Return an iterator that iterates over the scores list
+        return iter(self.scores)
+
+    def append_to_high_score(self, name: str, titanium: int):
+        # Create a new HighScore object and add it to the scores list
+        new_score = HighScore(name, titanium)
+        self.scores.append(new_score)
+        # Sort the scores list in descending order by titanium values
+        self.scores = sorted(self.scores, key=lambda score: score.titanium, reverse=True)
 
 def cls():
     if cls_state:
@@ -129,7 +162,7 @@ class Game:
         self.encounter_rate_visible = False
 
         self.game_dict = {}
-        self.high_scores_dict = {}
+        self.high_scores_obj = HighScoreList([])
 
         if DEBUG_MODE:
             logger.info('Game State initialized')
@@ -146,6 +179,8 @@ class Game:
     def main_menu(self):
         # Model While() loop for validating user input, should refactor all the other sub-menus to read like this.
         cls()
+        self.LoadHighScore()
+
         while self.game_state:
             if self.debug:
                 self.print_debug()
@@ -210,8 +245,25 @@ class Game:
 
     def high_scores(self):
         cls()
-        print("There are no scores to display")
-        print("\t[Back]")
+        count = 0
+        print("\tHIGH SCORES\n")
+
+        # Sort the high scores in descending order by titanium values
+        sorted_scores = sorted(self.high_scores_obj, key=lambda score: score.titanium, reverse=True)
+
+        # Determine the minimum score (if any)
+        min_score = min(sorted_scores, key=lambda score: score.titanium).titanium if sorted_scores else 0
+        min_score_name = next((score.name for score in sorted_scores if score.titanium == min_score), "")
+
+        # Ensure there are at least 10 high scores by padding with the minimum score
+        while len(sorted_scores) < 10:
+            sorted_scores.append(HighScore(min_score_name, min_score))
+
+        # Print the top 10 high scores
+        for count, jawn in enumerate(sorted_scores[:10], start=1):
+            print(f"({count}) {jawn.name} {jawn.titanium}")
+
+        print("\n\t[Back]")
         if input().lower() == "back" :
             self.main_menu()
 
@@ -251,7 +303,7 @@ class Game:
         cls()
         if self.debug:
             self.print_debug()
-        print("\n+==============================================================================+")
+        print("+==============================================================================+")
         print_robots(*self.robot_list)
         print("+==============================================================================+")
         print(f"| Titanium: {self.titanium}\t\t\t\t\t\t\t\t       |")
@@ -286,10 +338,13 @@ class Game:
                 self.robots -= 1
                 self.robot_list.pop()
                 if self.robots == 0:
+                    self.high_scores_obj.append_to_high_score(self.name, self.titanium)
+                    self.SaveHighScore()
                     print("Mission aborted, the last robot lost...")
                     print("|==============================|")
                     print("|          GAME OVER!          |")
                     print("|==============================|")
+
                     self.main_menu()
                 else:
                     print(f"{place.name} explored successfully, 1 robot lost...")
@@ -569,7 +624,27 @@ class Game:
         logger.info(f"Last save: {self.last_save}")
         logger.info("***********************************")
 
+    def SaveHighScore(self):
+        jsonified_highscores = json.dumps(self.high_scores_obj, default=lambda o: o.__dict__, indent=4)
+        with open(high_scores_data, "w") as f:
+            f.write(jsonified_highscores)
 
+    def LoadHighScore(self):
+        try:
+            with open(high_scores_data, "r") as f:
+                json_data = json.load(f)
+                score_dicts = json_data['scores']
+                hslist = [HighScore(**score_dict) for score_dict in score_dicts]
+                #self.high_scores_obj = sorted(hslist, key=lambda score: score.titanium, reverse=True)
+                self.high_scores_obj = HighScoreList(hslist)
+        except json.decoder.JSONDecodeError:
+            if DEBUG_MODE:
+                logger.info('hit json.decoder.JSONDecodeError for HighScores, using empty High Score Obj')
+                self.high_scores_obj = HighScoreList([])
+        except FileNotFoundError:
+            if DEBUG_MODE:
+                logger.info('hit FileNothFoundError for HighScores, using empty High Score Obj')
+                self.high_scores_obj = HighScoreList([])
 
 parser = argparse.ArgumentParser(description="Welcome to Bayan The Coolest, the coolest game ever")
 
@@ -589,4 +664,13 @@ game = Game(
 )
 
 game.main_menu()
-#game.upgrade()
+
+# hs1 = HighScore("Bayan1", 11)
+# hs2 = HighScore("bayan2", 22)
+# hs3 = HighScore("bayan3", 33)
+# hslist = HighScoreList([hs1, hs2, hs3])
+# game.high_scores_obj = hslist
+# game.SaveHighScore()
+
+#game.LoadHighScore()
+#print(game.high_scores_obj)
