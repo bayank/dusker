@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import List
 
+
 DEBUG_MODE = False
 cls_state = False
 savedata = "save_file.json"
