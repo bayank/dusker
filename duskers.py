@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import List
 
+import re
 
 DEBUG_MODE = False
 cls_state = False
@@ -15,12 +16,20 @@ savedata = "save_file.json"
 high_scores_data = "high_score.json"
 
 
+# Configure the logger
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-console_handler = logging.StreamHandler()
 log_format = '%(asctime)s %(levelname)s: %(message)s'
-console_handler.setFormatter(logging.Formatter(log_format))
-logger.addHandler(console_handler)
+
+# Create a StreamHandler to log to the console
+# console_handler = logging.StreamHandler()
+# console_handler.setFormatter(logging.Formatter(log_format))
+# logger.addHandler(console_handler)
+
+# Create a FileHandler to log to a file
+file_handler = logging.FileHandler('app_log.txt')  # Specify the log file name
+file_handler.setFormatter(logging.Formatter(log_format))
+logger.addHandler(file_handler)
 
 if DEBUG_MODE:
     logger.info('App Starting')
@@ -51,6 +60,8 @@ shape3 = \
 ─████▄▄▄▄▄█████\n\
 ──███████████▀─\
 ")
+
+
 
 
 class Robot:
@@ -202,11 +213,13 @@ class Game:
             print("[Exit]")
 
             command = (input("Your command:\n")).lower()
-
+            logging.info(f"User input at main_menu: {command}")
             if command == "new" or command == "n":
                 self.name = None
                 self.titanium = 0
                 self.robots = 0
+                self.titanium_visible = False
+                self.encounter_rate_visible = False
                 self.robot_list = [self.create_new_robot(), self.create_new_robot(), self.create_new_robot()]
                 self.play_sub_menu()
             elif command == "load" or command == "l":
@@ -228,17 +241,21 @@ class Game:
         cls()
         if self.name is None:
             self.name = input("Enter your name:")
+            logging.info(f"User input at playsubmenu(): {self.name}")
             print(f"Greetings, commander {self.name}!")
         else:
             print(f"Welcome back {self.name}!")
         print(f"Are you ready to begin?\n\t[Yes] [No] Return to Main[Menu]")
         begin = input("Your command:").lower()
+        logging.info(f"User input at Are You Ready to begin: {begin}")
         while begin not in ["yes", "no", "menu", "y", "n", "m"]:
             print("Invalid input. Please enter 'Yes' or 'No'.")
             begin = input("Your command: ").lower()
+            logging.info(f"User input if invalid command at are you ready to being: {begin}")
         while begin == "no" or begin == "n":
             print("How about now.\nAre you ready to begin?\n\t[Yes] [No] Return to Main[Menu]")
             begin = input("Your command: ").lower()
+            logging.info(f"User input at how about now: {begin}")
         if begin == "yes" or begin == "y":
             self.hub()
         elif begin == "menu" or begin == "m":
@@ -266,6 +283,7 @@ class Game:
 
         print("\n\t[Back]")
         if input().lower() == "back" :
+            logging.info(f"User input at high scores list: back")
             self.main_menu()
 
     def help_menu(self):
@@ -285,10 +303,12 @@ class Game:
         print("|==========================|")
 
         option = input("Your command:").lower()
+        logging.info(f"User input at hub_menu(): {option}")
 
         while option not in ["back", "b", "m", "menu", "s", "save", "e", "exit"]:
             print("Invalid input.")
             option = input("Your command: ").lower()
+            logging.info(f"User input at HubMenu() invalid command input: {option}")
         if option == "back" or option == "b":
             self.hub()
         if option == "main" or option == "m":
@@ -314,9 +334,11 @@ class Game:
         print("+==============================================================================+")
 
         option = input("Your command:").lower()
+        logging.info(f"User input at hub(): {option}")
         while option not in ["ex", "explore", "e", "up", "upgrade", "u", "save", "s", "m", "menu"]:
             print("Invalid input.")
             option = input("Your command: ").lower()
+            logging.info(f"User input at hub() after invalid input: {option}")
         if option == "ex" or option == "explore" or option == "e":
             self.explore()
         if option == "up" or option == "upgrade" or option == "u":
@@ -391,6 +413,7 @@ class Game:
 
             print("[S] to continue searching")
             user_input = input("Your command: ")
+            logging.info(f"User input at enter s to continue searching: {user_input}")
 
             if user_input == "back" or user_input == "back":
                 self.hub()
@@ -409,6 +432,7 @@ class Game:
                             print("Nothing more in sight.")
                             print("[Back]")
                             user_input = input("Your command: ")
+                            logging.info(f"User input at explore with nothing more in sight: {user_input}")
 
                         # A valid place selected, deploy robots
                         elif user_input in [str(location.num) for location in self.explored_locations]:
@@ -444,6 +468,7 @@ class Game:
             self.pick_slot(savedata)
             print("Your Command:")
             slot = input("")
+            logging.info(f"User input at load menu to pick slot: {slot}")
 
             if slot in ["1", "2", "3"]:
                 while True:
@@ -469,6 +494,7 @@ class Game:
             self.pick_slot(savedata)
             print("Your Command:")
             slot = input("")
+            logging.info(f"User input at savemenu to pick slot: {slot}")
 
             if slot in ["1", "2", "3"]:
                 self.save(savedata,slot)
@@ -574,6 +600,7 @@ class Game:
 
         while True:
             choice = input("Your command:")
+            logging.info(f"User input at upgrade(): {choice}")
 
             if choice =="1":
                 if self.titanium < 250:
@@ -609,21 +636,22 @@ class Game:
 
 
     def print_debug(self):
-        logger.info("***********************************")
-        logger.info(f"Debug: {self.debug}")
-        logger.info(f"Game State: {self.game_state}")
-        logger.info(f"Player Name: {self.name}")
-        logger.info(f"Seed: {self.seed}")
-        logger.info(f"Min_Duration: {self.min_duration}")
-        logger.info(f"Max_duration: {self.max_duration}")
-        logger.info(f"Locations: {self.locations}")
-        logger.info(f"Titanium: {self.titanium}")
+        # logger.info("***********************************")
+        # logger.info(f"Debug: {self.debug}")
+        # logger.info(f"Game State: {self.game_state}")
+        # logger.info(f"Player Name: {self.name}")
+        # logger.info(f"Seed: {self.seed}")
+        # logger.info(f"Min_Duration: {self.min_duration}")
+        # logger.info(f"Max_duration: {self.max_duration}")
+        # logger.info(f"Locations: {self.locations}")
+        # logger.info(f"Titanium: {self.titanium}")
         logger.info(f"Number of Robots: {self.robots}")
         logger.info(f"Robots List: {self.robot_list}")
-        logger.info(f"titanium_visible: {self.titanium_visible}")
-        logger.info(f"encounter_rate_visible: {self.encounter_rate_visible}")
-        logger.info(f"Last save: {self.last_save}")
-        logger.info("***********************************")
+        # logger.info(f"titanium_visible: {self.titanium_visible}")
+        # logger.info(f"encounter_rate_visible: {self.encounter_rate_visible}")
+        # logger.info(f"Last save: {self.last_save}")
+        # logger.info("***********************************")
+        pass
 
     def SaveHighScore(self):
         jsonified_highscores = json.dumps(self.high_scores_obj, default=lambda o: o.__dict__, indent=4)
@@ -647,6 +675,71 @@ class Game:
                 logger.info('hit FileNothFoundError for HighScores, using empty High Score Obj')
                 self.high_scores_obj = HighScoreList([])
 
+
+def get_robot_lines(hub: str) -> List[str]:
+    hub_lines = re.split("\n+", hub)
+
+    robots = []
+    state = 0
+    for line in hub_lines:
+        if len(line.strip()) > 0 and line.strip()[0] == '+':
+            if state == 1:
+                state = 2
+                break
+            else:
+                state = 1
+            continue
+        if state == 1:
+            robots.append(line)
+
+    if state != 2:
+        raise ValueError(
+            "Please make sure your HUB contains two lines, starting with '+' character\n"
+            "Robot images should be placed between first two of them."
+        )
+
+    return robots
+
+def check_graphical_robots(robots_display: List[str], number_of_robots: int) \
+        -> bool:
+    """helper method to check for arbitrary number of robots"""
+
+    result = True
+
+    if number_of_robots == 0:
+        return True
+
+    if len(robots_display) == 0:
+        return False
+
+    positions = []
+    prev_position = -1
+    while robots_display[0].find("|", prev_position + 1) != -1:
+        prev_position = robots_display[0].find("|", prev_position + 1)
+        positions.append(prev_position)
+    if len(positions) != number_of_robots - 1:
+        print("if len(positions) != number_of_robots - 1:")
+        return False
+
+    for line in robots_display:
+        stripped_lines = [robot_line.strip() for robot_line in re.split("\|", line)]
+
+        if len(stripped_lines) != number_of_robots:
+            print("if len(stripped_lines) != number_of_robots:")
+            return False
+
+        prev_position = -1
+        for pos in positions:
+            if line.find("|", prev_position + 1) != pos:
+                print("if line.find(, prev_position + 1) != pos:")
+                return False
+            prev_position = pos
+
+        result = result and all(
+            (robot == stripped_lines[0] and (robot != "" or number_of_robots == 0)) for robot in stripped_lines[1:])
+
+    return result
+
 parser = argparse.ArgumentParser(description="Welcome to Bayan The Coolest, the coolest game ever")
 
 parser.add_argument("seed", type=str, nargs='?', default=69, help="Random seed (default: 69)")
@@ -664,7 +757,47 @@ game = Game(
     locations=args.locations
 )
 
+logging.info(f"Launched with these arguments: seed={args.seed}, min_duration={args.min_duration}, max_duration={args.max_duration}, locations={args.locations}")
+
 game.main_menu()
+
+hubstr = "+==============================================================================+\n\
+  ────▄▄────▄▄─── | ────▄▄────▄▄─── | ░░░░░█▀▀█▄░░░░░\n\
+  ▄▄▄─██▌──▐██──▄ | ▄▄▄─██▌──▐██──▄ | ░░░░█░░░▄██░░░░\n\
+  ████────────███ | ████────────███ | ░░░█░░▐█░░░░░░░\n\
+  ─████▄▄▄▄▄█████ | ─████▄▄▄▄▄█████ | ░░░█░░░░▀█░░░░░\n\
+  ──███████████▀─ | ──███████████▀─ | ░░░░▀█▄▄▄▄█░░░░\n\
++==============================================================================+\n\
+| Titanium: 0								       |\n\
++==============================================================================+\n\
+| 		[Ex]plore			[Up]grade		       |\n\
+| 		[Save]				[M]enu			       |\n\
++==============================================================================+\n\
+Your command:"
+
+
+
+hubstr2 = "+==============================================================================+\n\
+$   $$$$$$$   $  |  $   $$$$$$$   $  |  $   $$$$$$$   $\n\
+$$$$$     $$$$$  |  $$$$$     $$$$$  |  $$$$$     $$$$$\n\
+$$$$$$$      |      $$$$$$$      |      $$$$$$$\n\
+$$$   $$$     |     $$$   $$$     |     $$$   $$$\n\
+$       $     |     $       $     |     $       $\n\
++==============================================================================+\n\
+| Titanium: 42                                                                 |\n\
++==============================================================================+\n\
+|                  [Ex]plore                          [Up]grade                |\n\
+|                  [Save]                             [M]enu                   |\n\
++==============================================================================+\n\
+\n\
+Your command:"
+
+
+# #print(get_robot_lines(hubstr2))
+# hub_lines = get_robot_lines(hubstr2)
+# check_graphical_robots(hub_lines, 3)
+# print(check_graphical_robots(hub_lines, 3))
+
 
 # hs1 = HighScore("Bayan1", 11)
 # hs2 = HighScore("bayan2", 22)
