@@ -1,2 +1,5 @@
 .DS_Store
 venv
+app_log.txt
+high_score.json
+save_file.json
